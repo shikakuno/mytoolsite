@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>売上配分シミュレーション</title>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f1b33;
+      --panel2:#0c162b;
+      --text:#e9eefb;
+      --muted:#b8c3de;
+      --line:#223457;
+
+      --green:#1f8a4c;
+      --green2:#165f36;
+      --blue:#2b6de2;
+      --blue2:#1e4fb2;
+
+      --danger:#e25252;
+      --warning:#ffcc66;
+      --ok:#61d17a;
+
+      --shadow: 0 10px 25px rgba(0,0,0,.25);
+      --radius: 14px;
+    }
+
+    *{ box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+      background: radial-gradient(1200px 700px at 10% 10%, rgba(43,109,226,.16), transparent 60%),
+                  radial-gradient(1000px 650px at 90% 20%, rgba(31,138,76,.14), transparent 55%),
+                  linear-gradient(180deg, #0b1220, #070d18);
+      color: var(--text);
+    }
+    header{
+      padding: 26px 18px 6px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1{
+      margin:0 0 10px;
+      font-size: 26px;
+      letter-spacing: .02em;
+    }
+    .subtitle{
+      margin:0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    main{
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 18px 36px;
+      display: grid;
+      gap: 16px;
+    }
+
+    section{
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+    section > h2{
+      margin: 0 0 12px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.6fr 1fr 1fr 1fr;
+      gap: 12px;
+      align-items: end;
+    }
+    label{
+      display:block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 6px;
+    }
+    textarea, input[type="text"], select, input[type="number"]{
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(12,22,43,.75);
+      color: var(--text);
+      padding: 10px 10px;
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+    }
+    textarea{ min-height: 44px; resize: vertical; }
+    input:focus, textarea:focus, select:focus{
+      border-color: rgba(43,109,226,.7);
+      box-shadow: 0 0 0 3px rgba(43,109,226,.18);
+    }
+    input[disabled], select[disabled], textarea[disabled]{
+      opacity: .55;
+      cursor: not-allowed;
+    }
+    input[readonly]{
+      opacity: .85;
+    }
+
+    .row-actions{
+      display:flex;
+      gap:10px;
+      justify-content: flex-end;
+      align-items:center;
+    }
+
+    .btn{
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor:pointer;
+      transition: transform .05s ease, background .15s ease, border-color .15s ease;
+      user-select:none;
+      font-weight: 600;
+      letter-spacing: .01em;
+      white-space: nowrap;
+    }
+    .btn:hover{
+      background: rgba(255,255,255,.10);
+      border-color: rgba(255,255,255,.18);
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn-primary{
+      background: linear-gradient(180deg, rgba(43,109,226,.85), rgba(30,79,178,.85));
+      border-color: rgba(43,109,226,.65);
+    }
+    .btn-primary:hover{
+      background: linear-gradient(180deg, rgba(43,109,226,.95), rgba(30,79,178,.95));
+    }
+    .btn-danger{
+      background: rgba(226,82,82,.14);
+      border-color: rgba(226,82,82,.45);
+      color: #ffd6d6;
+    }
+    .btn-danger:hover{
+      background: rgba(226,82,82,.22);
+      border-color: rgba(226,82,82,.62);
+    }
+    .btn-small{
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
+    .cards{
+      margin-top: 14px;
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .card-title{
+      font-weight: 800;
+      margin: 0 0 6px;
+      font-size: 14px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+    }
+    .card-meta{
+      color: var(--muted);
+      font-size: 12px;
+      display:flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 0 0 10px;
+    }
+    .tag{
+      display:inline-flex;
+      align-items:center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.15);
+    }
+    .tag strong{ color: var(--text); font-weight: 800; }
+
+    .table-wrap{
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.07);
+      background: rgba(12,22,43,.55);
+    }
+    table{
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 1200px;
+    }
+    th, td{
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      border-right: 1px solid rgba(255,255,255,.05);
+      padding: 8px;
+      vertical-align: top;
+    }
+    th:last-child, td:last-child{ border-right: none; }
+    tr:last-child td{ border-bottom: none; }
+
+    thead th{
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      font-size: 12px;
+      letter-spacing: .02em;
+      text-align: center;
+      color: rgba(255,255,255,.92);
+      padding: 10px 8px;
+    }
+
+    .th-green{
+      background: linear-gradient(180deg, rgba(31,138,76,.35), rgba(22,95,54,.30));
+      border-bottom-color: rgba(31,138,76,.35);
+    }
+    .th-blue{
+      background: linear-gradient(180deg, rgba(43,109,226,.35), rgba(30,79,178,.30));
+      border-bottom-color: rgba(43,109,226,.35);
+    }
+
+    .cell-stack{
+      display:flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .cell-stack input{
+      padding: 8px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+    .cell-stack .hours-input{
+      background: rgba(255,255,255,.06);
+    }
+    .cell-stack .cost-input{
+      background: rgba(255,255,255,.04);
+    }
+
+    .muted{
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pl-area{
+      display: grid;
+      gap: 14px;
+    }
+    .pl-table{
+      width: 100%;
+      min-width: 920px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(12,22,43,.55);
+      border: 1px solid rgba(255,255,255,.07);
+    }
+    .pl-table table{
+      min-width: 920px;
+    }
+    .pl-table caption{
+      caption-side: top;
+      text-align: left;
+      padding: 10px 12px;
+      font-weight: 900;
+      color: rgba(255,255,255,.94);
+      background: rgba(0,0,0,.18);
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+    .pl-table th{
+      background: rgba(255,255,255,.06);
+      font-weight: 800;
+    }
+    .pl-table td{
+      font-size: 12px;
+    }
+    .pl-left{
+      width: 260px;
+      font-weight: 800;
+      text-align: left;
+      white-space: nowrap;
+    }
+    .num{
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .pl-group{
+      background: rgba(255,255,255,.03);
+    }
+    .pl-sub{
+      color: rgba(255,255,255,.85);
+    }
+
+    /* info-box: 仕様で非表示（CSSが残っていてもよい） */
+    .info-box{
+      display:none;
+    }
+
+    @media (max-width: 860px){
+      .grid{
+        grid-template-columns: 1fr;
+      }
+      .row-actions{
+        justify-content: flex-start;
+      }
+      .pl-left{ width: 220px; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>売上配分シミュレーション</h1>
+    <p class="subtitle">案件情報・原価入力・損益（PL）をひとつの画面で扱う簡易シミュレーション（サンプル実装）</p>
+  </header>
+
+  <main>
+    <!-- セクション1：案件情報 -->
+    <section>
+      <h2>📁 案件情報</h2>
+
+      <div class="grid">
+        <div>
+          <label for="projectName">案件名</label>
+          <textarea id="projectName" placeholder="例）○○システム更改（フェーズ1）"></textarea>
+        </div>
+
+        <div>
+          <label for="projectAmount">受注金額</label>
+          <input id="projectAmount" type="text" inputmode="numeric" placeholder="例）12000000" />
+        </div>
+
+        <div>
+          <label for="startMonth">プロジェクト開始月</label>
+          <select id="startMonth"></select>
+        </div>
+
+        <div>
+          <label for="endMonth">プロジェクト終了月</label>
+          <select id="endMonth"></select>
+        </div>
+      </div>
+
+      <div class="row-actions" style="margin-top:12px;">
+        <button class="btn btn-primary" onclick="addProject()">＋ 案件を追加</button>
+      </div>
+
+      <div class="cards" id="projectCards"></div>
+    </section>
+
+    <!-- セクション2：プロジェクト原価入力 -->
+    <section>
+      <h2>💰 プロジェクト原価入力</h2>
+
+      <div class="row-actions" style="margin-bottom:12px;">
+        <button class="btn btn-primary" onclick="addCostRow()">＋ 行を追加</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="th-green">案件名</th>
+              <th class="th-green">要員名</th>
+              <th class="th-green">組織</th>
+              <th class="th-green">費目</th>
+              <th class="th-green">ランク</th>
+              <th class="th-green">単価</th>
+              <th class="th-blue">10月</th>
+              <th class="th-blue">11月</th>
+              <th class="th-blue">12月</th>
+              <th class="th-blue">1月</th>
+              <th class="th-blue">2月</th>
+              <th class="th-blue">3月</th>
+              <th class="th-green">操作</th>
+            </tr>
+          </thead>
+          <tbody id="costTbody"></tbody>
+        </table>
+      </div>
+
+      <p class="muted" style="margin:10px 0 0;">
+        ※案件を削除しても原価行は画面上に残りますが、集計・PL からは除外されます。
+      </p>
+    </section>
+
+    <!-- セクション3：プロジェクト損益 -->
+    <section>
+      <h2>📈 プロジェクト損益</h2>
+      <div class="pl-area" id="plArea"></div>
+    </section>
+  </main>
+
+  <script>
+    // =========================
+    // Data / Master
+    // =========================
+    const months = ['10', '11', '12', '1', '2', '3'];
+
+    const rankPrices = {
+      6: 8818,
+      5: 7791,
+      4: 7067,
+      3: 6598,
+      2: 6123
+    };
+
+    let projects = [];     // { id, name, amount, startMonth, endMonth }
+    let costRowSeq = 1;
+    let projectSeq = 1;
+
+    const dummyMembers = ['要員A', '要員B', '要員C', '要員D', '要員E'];
+    const orgs = ['営業', '開発', 'テクノ', '管理'];
+    const expenseTypes = [
+      { value: '', label: '（未選択）' },
+      { value: 'employee', label: '社員人工費' },
+      { value: 'outsourcing', label: '外注費' },
+      { value: 'direct', label: '直課経費' }
+    ];
+
+    // =========================
+    // Utilities
+    // =========================
+    function toIntSafe(v){
+      const n = parseInt(v, 10);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function parseNumberLike(str){
+      if (str == null) return 0;
+      const s = String(str).replace(/[^\d.-]/g, '');
+      const n = Number(s);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function formatComma(n){
+      if (!Number.isFinite(n)) n = 0;
+      return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    function formatCommaMaybeBlank(n, blankIfZero=false){
+      if (!Number.isFinite(n)) n = 0;
+      if (blankIfZero && n === 0) return '';
+      return formatComma(n);
+    }
+
+    function formatPercent(rate){
+      const r = Number.isFinite(rate) ? rate : 0;
+      return (r * 100).toFixed(1) + '%';
+    }
+
+    // 入力欄（text）を「数値 + カンマ」に整形
+    function formatCurrencyInput(el){
+      const raw = el.value;
+      const n = parseNumberLike(raw);
+      if (raw.trim() === '') return; // 空はそのまま
+      el.value = formatComma(Math.max(0, n));
+    }
+
+    // caret の細かい制御は省略（サンプルとして十分動く実装）
+    function onCurrencyTyping(el){
+      const n = parseNumberLike(el.value);
+      if (el.value.trim() === '') return;
+      el.value = formatComma(Math.max(0, n));
+    }
+
+    function buildMonthSelectOptions(withPlaceholder=true){
+      let html = '';
+      if (withPlaceholder) html += '<option value="">-- 選択 --</option>';
+      for (const m of months){
+        html += `<option value="${m}">${m}月</option>`;
+      }
+      return html;
+    }
+
+    // =========================
+    // セクション1：案件情報
+    // =========================
+    function addProject(){
+      const nameEl = document.getElementById('projectName');
+      const amtEl  = document.getElementById('projectAmount');
+      const sEl    = document.getElementById('startMonth');
+      const eEl    = document.getElementById('endMonth');
+
+      const name = nameEl.value.trim();
+      const amount = parseNumberLike(amtEl.value);
+      const startMonth = sEl.value;
+      const endMonth = eEl.value;
+
+      if (!name || amount <= 0 || !startMonth || !endMonth){
+        alert('案件名、受注金額（0より大きい）、開始月、終了月は必須です。');
+        return;
+      }
+
+      const project = {
+        id: 'p' + (projectSeq++),
+        name,
+        amount: Math.round(amount),
+        startMonth,
+        endMonth
+      };
+      projects.push(project);
+
+      // clear
+      nameEl.value = '';
+      amtEl.value = '';
+      sEl.value = '';
+      eEl.value = '';
+
+      renderProjectList();
+      updateProjectSelects();
+      updateSummary();
+    }
+
+    function deleteProject(id){
+      const target = projects.find(p => p.id === id);
+      if (!target) return;
+
+      if (!confirm(`案件「${target.name}」を削除しますか？（原価行は残りますが、集計・PL から除外されます）`)){
+        return;
+      }
+      projects = projects.filter(p => p.id !== id);
+      renderProjectList();
+      updateProjectSelects();
+      updateSummary();
+    }
+
+    function renderProjectList(){
+      const area = document.getElementById('projectCards');
+      if (projects.length === 0){
+        area.innerHTML = `<div class="muted">案件が未登録です。「＋ 案件を追加」で登録してください。</div>`;
+        return;
+      }
+
+      area.innerHTML = projects.map(p => {
+        return `
+          <div class="card">
+            <div class="card-title">${escapeHtml(p.name)}</div>
+            <div class="card-meta">
+              <span class="tag">受注金額：<strong>${formatComma(p.amount)}</strong></span>
+              <span class="tag">期間：<strong>${p.startMonth}月〜${p.endMonth}月</strong></span>
+            </div>
+            <div class="row-actions">
+              <button class="btn btn-danger btn-small" onclick="deleteProject('${p.id}')">削除</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // projects の案件名を原価行の案件selectへ反映
+    function updateProjectSelects(){
+      const selects = document.querySelectorAll('select.project-select');
+      selects.forEach(sel => {
+        const current = sel.value;
+
+        // options を再構築（現在値が projects に存在しない場合は「削除済」を追加して保持）
+        let html = `<option value="">選択してください</option>`;
+        for (const p of projects){
+          html += `<option value="${p.id}">${escapeHtml(p.name)}</option>`;
+        }
+
+        const stillExists = current && projects.some(p => p.id === current);
+        if (current && !stillExists){
+          // 既存行の値を保持（ただし集計は除外される）
+          html += `<option value="${current}">（削除済の案件）</option>`;
+        }
+
+        sel.innerHTML = html;
+
+        // restore selection
+        sel.value = current;
+      });
+    }
+
+    // =========================
+    // セクション2：原価入力
+    // =========================
+    function addCostRow(){
+      const rowId = 'r' + (costRowSeq++);
+      const tbody = document.getElementById('costTbody');
+
+      const memberOptions = dummyMembers.map(n => `<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+      const orgOptions = orgs.map(n => `<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+      const expenseOptions = expenseTypes.map(x => `<option value="${x.value}">${escapeHtml(x.label)}</option>`).join('');
+      const rankOptions = [6,5,4,3,2].map(r => `<option value="${r}">${r}</option>`).join('');
+
+      const monthCells = months.map(m => {
+        return `
+          <td>
+            <div class="cell-stack">
+              <input type="number"
+                     class="hours-input"
+                     data-month="${m}"
+                     min="0" max="250" step="0.1"
+                     placeholder="工数"
+                     oninput="onHoursChange('${rowId}','${m}')">
+              <input type="text"
+                     class="cost-input"
+                     data-month="${m}"
+                     placeholder="費用"
+                     oninput="onCostInputChange('${rowId}','${m}')">
+            </div>
+          </td>
+        `;
+      }).join('');
+
+      const tr = document.createElement('tr');
+      tr.id = rowId;
+      tr.innerHTML = `
+        <td>
+          <select class="project-select" onchange="onProjectChange('${rowId}')">
+            <option value="">選択してください</option>
+          </select>
+        </td>
+        <td>
+          <select>
+            ${memberOptions}
+          </select>
+        </td>
+        <td>
+          <select>
+            ${orgOptions}
+          </select>
+        </td>
+        <td>
+          <select class="expense-type" onchange="onExpenseTypeChange('${rowId}')">
+            ${expenseOptions}
+          </select>
+        </td>
+        <td>
+          <select class="rank-select" onchange="onRankChange('${rowId}')">
+            ${rankOptions}
+          </select>
+        </td>
+        <td>
+          <input type="text" class="unit-price" placeholder="単価" oninput="onUnitPriceTyping('${rowId}')">
+        </td>
+        ${monthCells}
+        <td style="text-align:center;">
+          <button class="btn btn-danger btn-small" onclick="deleteCostRow('${rowId}')">削除</button>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+
+      updateProjectSelects();
+
+      // 初期状態は費目未選択として「両方入力可」寄り
+      // ただし案件未選択なら月活性制御はしない（全月期間内扱いでもよい）
+      onExpenseTypeChange(rowId);
+      applyProjectMonthActivation(rowId);
+      updateSummary();
+    }
+
+    function deleteCostRow(rowId){
+      const tr = document.getElementById(rowId);
+      if (tr) tr.remove();
+      updateSummary();
+    }
+
+    function getRowEl(rowId){
+      return document.getElementById(rowId);
+    }
+
+    function getSelectedProjectByRow(rowId){
+      const row = getRowEl(rowId);
+      if (!row) return null;
+      const sel = row.querySelector('select.project-select');
+      const pid = sel ? sel.value : '';
+      if (!pid) return null;
+      return projects.find(p => p.id === pid) || null; // 削除済なら null
+    }
+
+    function onProjectChange(rowId){
+      applyProjectMonthActivation(rowId);
+      // 期間制御の結果、値クリアが起きるので PL 反映
+      updateSummary();
+    }
+
+    // ===== 案件期間判定（仕様のロジック）
+    function isMonthInProject(project, month){
+      if (!project) return true; // 未選択なら全月期間内扱いでもよい
+      const sIdx = months.indexOf(project.startMonth);
+      const eIdx = months.indexOf(project.endMonth);
+      const idx  = months.indexOf(month);
+
+      if (sIdx === -1 || eIdx === -1 || idx === -1) return true;
+
+      if (sIdx <= eIdx){
+        return sIdx <= idx && idx <= eIdx;
+      }else{
+        // 折り返し
+        return idx >= sIdx || idx <= eIdx;
+      }
+    }
+
+    // プロジェクトの期間（月配列上の順）を start→end で作る（累計・進捗用）
+    function getProjectMonthSequence(project){
+      if (!project) return [...months];
+      const sIdx = months.indexOf(project.startMonth);
+      const eIdx = months.indexOf(project.endMonth);
+      if (sIdx === -1 || eIdx === -1) return [...months];
+
+      const seq = [];
+      let i = sIdx;
+      while (true){
+        seq.push(months[i]);
+        if (i === eIdx) break;
+        i = (i + 1) % months.length;
+        // 念のため無限ループ防止
+        if (seq.length > 12) break;
+      }
+      return seq;
+    }
+
+    function applyProjectMonthActivation(rowId){
+      const row = getRowEl(rowId);
+      if (!row) return;
+
+      const project = getSelectedProjectByRow(rowId);
+
+      // 期間外は disabled & 値クリア
+      months.forEach(m => {
+        const inPeriod = isMonthInProject(project, m);
+        const hoursEl = row.querySelector(`.hours-input[data-month="${m}"]`);
+        const costEl  = row.querySelector(`.cost-input[data-month="${m}"]`);
+
+        if (!hoursEl || !costEl) return;
+
+        if (!inPeriod){
+          hoursEl.value = '';
+          costEl.value  = '';
+          hoursEl.disabled = true;
+          costEl.disabled  = true;
+          hoursEl.readOnly = true;
+          costEl.readOnly  = true;
+        }else{
+          // 期間内は費目ルールで有効/無効を決める
+          hoursEl.disabled = false;
+          costEl.disabled  = false;
+          hoursEl.readOnly = false;
+          costEl.readOnly  = false;
+        }
+      });
+
+      // 期間内セルに対して費目別ルールを適用
+      onExpenseTypeChange(rowId);
+    }
+
+    function onExpenseTypeChange(rowId){
+      const row = getRowEl(rowId);
+      if (!row) return;
+
+      const project = getSelectedProjectByRow(rowId);
+      const expenseEl = row.querySelector('select.expense-type');
+      const rankEl = row.querySelector('select.rank-select');
+      const unitEl = row.querySelector('input.unit-price');
+
+      const expense = expenseEl ? expenseEl.value : '';
+
+      // デフォルト状態：両方入力可（費目未選択）
+      let rankDisabled = false;
+      let unitDisabled = false;
+      let unitReadOnly = false;
+
+      if (expense === 'direct'){
+        // 直課経費：ランク不要、単価不要
+        rankDisabled = true;
+        unitDisabled = true;
+        unitReadOnly = true;
+        unitEl.value = '';
+      }else if (expense === 'employee'){
+        // 社員人工費：単価はランクに従い自動設定＆編集不可
+        rankDisabled = false;
+        unitDisabled = false;
+        unitReadOnly = true;
+      }else if (expense === 'outsourcing'){
+        // 外注費：ランクで初期値セット、編集可
+        rankDisabled = false;
+        unitDisabled = false;
+        unitReadOnly = false;
+      }else{
+        // 未選択：自由入力
+        rankDisabled = false;
+        unitDisabled = false;
+        unitReadOnly = false;
+      }
+
+      if (rankEl) rankEl.disabled = rankDisabled;
+      if (unitEl){
+        unitEl.disabled = unitDisabled;
+        unitEl.readOnly = unitReadOnly;
+        if (unitDisabled) unitEl.value = '';
+      }
+
+      // 月別入力可否の切り替え（期間内のみ適用）
+      months.forEach(m => {
+        const hoursEl = row.querySelector(`.hours-input[data-month="${m}"]`);
+        const costEl  = row.querySelector(`.cost-input[data-month="${m}"]`);
+        if (!hoursEl || !costEl) return;
+
+        const inPeriod = isMonthInProject(project, m);
+        if (!inPeriod){
+          // 期間外は既に disabled
+          return;
+        }
+
+        if (expense === 'employee' || expense === 'outsourcing'){
+          // 工数入力可、費用は自動計算（readOnly）
+          hoursEl.disabled = false;
+          hoursEl.readOnly = false;
+          costEl.disabled = false;
+          costEl.readOnly = true;
+        }else if (expense === 'direct'){
+          // 工数入力不可、費用手入力可
+          hoursEl.value = '';
+          hoursEl.disabled = true;
+          hoursEl.readOnly = true;
+
+          costEl.disabled = false;
+          costEl.readOnly = false;
+        }else{
+          // 未選択：両方入力可（初期化してよい）
+          hoursEl.disabled = false;
+          hoursEl.readOnly = false;
+
+          costEl.disabled = false;
+          costEl.readOnly = false;
+        }
+      });
+
+      // ランク単価反映 & 再計算
+      if (expense === 'employee' || expense === 'outsourcing'){
+        onRankChange(rowId); // rankChange 内で再計算
+      }else{
+        // 直課経費や未選択：単価計算不要だが、社員/外注から切り替えた場合に費用を再計算/解除
+        months.forEach(m => {
+          const inPeriod = isMonthInProject(project, m);
+          if (!inPeriod) return;
+          if (expense === 'direct'){
+            // directは費用手入力なので計算しない
+          }else if (expense === ''){
+            // 未選択：何もしない（手入力維持）
+          }
+        });
+        updateSummary();
+      }
+    }
+
+    function onRankChange(rowId){
+      const row = getRowEl(rowId);
+      if (!row) return;
+
+      const expenseEl = row.querySelector('select.expense-type');
+      const rankEl = row.querySelector('select.rank-select');
+      const unitEl = row.querySelector('input.unit-price');
+      const expense = expenseEl ? expenseEl.value : '';
+      const rank = rankEl ? rankEl.value : '';
+
+      if (expense === 'employee' || expense === 'outsourcing'){
+        const price = rankPrices[toIntSafe(rank)] || 0;
+        if (unitEl){
+          unitEl.value = price ? formatComma(price) : '';
+          unitEl.disabled = false;
+          unitEl.readOnly = (expense === 'employee'); // 社員は編集不可
+        }
+        // 全月再計算
+        months.forEach(m => calculateCost(rowId, m));
+      }else{
+        // direct / 未選択は単価更新不要
+      }
+
+      updateSummary();
+    }
+
+    function onUnitPriceTyping(rowId){
+      const row = getRowEl(rowId);
+      if (!row) return;
+
+      const expense = row.querySelector('select.expense-type')?.value || '';
+      const unitEl  = row.querySelector('input.unit-price');
+      if (!unitEl) return;
+
+      // 直課経費は使わない
+      if (expense === 'direct') return;
+
+      onCurrencyTyping(unitEl);
+
+      // 単価編集したら再計算（社員は readOnly のため実質編集不可）
+      months.forEach(m => calculateCost(rowId, m));
+      updateSummary();
+    }
+
+    function onHoursChange(rowId, month){
+      const row = getRowEl(rowId);
+      if (!row) return;
+
+      const hoursEl = row.querySelector(`.hours-input[data-month="${month}"]`);
+      if (!hoursEl) return;
+
+      let v = Number(hoursEl.value);
+      if (!Number.isFinite(v)) v = 0;
+      if (v < 0) v = 0;
+      if (v > 250) v = 250;
+      // step=0.1なので小数は許容（表示はそのまま）
+      hoursEl.value = v;
+
+      calculateCost(rowId, month);
+      updateSummary();
+    }
+
+    function onCostInputChange(rowId, month){
+      const row = getRowEl(rowId);
+      if (!row) return;
+
+      const project = getSelectedProjectByRow(rowId);
+      // 期間外は入力不可だが念のため
+      if (!isMonthInProject(project, month)) return;
+
+      const expense = row.querySelector('select.expense-type')?.value || '';
+      const costEl = row.querySelector(`.cost-input[data-month="${month}"]`);
+      if (!costEl) return;
+
+      // 社員/外注の費用は自動計算（readOnly想定）だが、念のためガード
+      if (expense === 'employee' || expense === 'outsourcing'){
+        calculateCost(rowId, month);
+        updateSummary();
+        return;
+      }
+
+      // 直課経費 or 未選択：手入力（カンマ整形）
+      onCurrencyTyping(costEl);
+      updateSummary();
+    }
+
+    function calculateCost(rowId, month){
+      const row = getRowEl(rowId);
+      if (!row) return;
+
+      const project = getSelectedProjectByRow(rowId);
+      if (!isMonthInProject(project, month)) return;
+
+      const expense = row.querySelector('select.expense-type')?.value || '';
+      const unitEl  = row.querySelector('input.unit-price');
+      const hoursEl = row.querySelector(`.hours-input[data-month="${month}"]`);
+      const costEl  = row.querySelector(`.cost-input[data-month="${month}"]`);
+
+      if (!hoursEl || !costEl) return;
+
+      if (expense === 'employee' || expense === 'outsourcing'){
+        const unit = parseNumberLike(unitEl ? unitEl.value : '');
+        const hours = Number(hoursEl.value || 0);
+        const cost = unit * hours;
+        costEl.value = cost ? formatComma(cost) : '';
+      }else{
+        // direct / 未選択：計算しない
+      }
+    }
+
+    // =========================
+    // セクション3：PL（損益表）
+    // =========================
+    function updateSummary(){
+      const area = document.getElementById('plArea');
+
+      if (projects.length === 0){
+        area.innerHTML = `<div class="muted">案件を登録してください。</div>`;
+        return;
+      }
+
+      // 案件ごとに PL を構築（削除済案件は projects から消えているので表示しない）
+      area.innerHTML = projects.map(p => {
+        return `
+          <div class="pl-table">
+            ${buildProjectPLHtml(p)}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function buildProjectPLHtml(project){
+      // 原価集計：費目別・月別
+      const costMap = {
+        employee: Object.fromEntries(months.map(m => [m, 0])),
+        outsourcing: Object.fromEntries(months.map(m => [m, 0])),
+        direct: Object.fromEntries(months.map(m => [m, 0]))
+      };
+
+      // 原価入力テーブルから読み取り（案件削除済の行は project が見つからないので除外）
+      const rows = Array.from(document.querySelectorAll('#costTbody tr'));
+      for (const tr of rows){
+        const pid = tr.querySelector('select.project-select')?.value || '';
+        if (!pid) continue;
+        if (pid !== project.id) continue; // 対象案件のみ
+
+        const expense = tr.querySelector('select.expense-type')?.value || '';
+        if (!['employee','outsourcing','direct'].includes(expense)) continue;
+
+        for (const m of months){
+          const costEl = tr.querySelector(`.cost-input[data-month="${m}"]`);
+          const val = parseNumberLike(costEl ? costEl.value : '');
+          if (val) costMap[expense][m] += val;
+        }
+      }
+
+      // 月別の売上原価（=社員+外注+直課）
+      const cogs = Object.fromEntries(months.map(m => [m, costMap.employee[m] + costMap.outsourcing[m] + costMap.direct[m]]));
+
+      // 総原価見込
+      const totalCost = months.reduce((s,m) => s + cogs[m], 0);
+
+      // 進捗（原価累計/総原価見込）：開始月→終了月 の順序で累計を作り、表示列へマッピング
+      const seq = getProjectMonthSequence(project);
+      const cumCostByMonth = Object.fromEntries(months.map(m => [m, 0]));
+
+      let cum = 0;
+      for (const m of seq){
+        cum += cogs[m] || 0;
+        cumCostByMonth[m] = cum;
+      }
+
+      const progressRateByMonth = Object.fromEntries(months.map(m => {
+        const inPeriod = isMonthInProject(project, m);
+        if (!inPeriod) return [m, 0];
+        if (totalCost <= 0) return [m, 0];
+        return [m, Math.min(1, (cumCostByMonth[m] || 0) / totalCost)];
+      }));
+
+      // 進行売上（受注金額×進捗率）…月別は累計側の値として表示（仕様通り）
+      const progressSales = Object.fromEntries(months.map(m => {
+        const inPeriod = isMonthInProject(project, m);
+        return [m, inPeriod ? project.amount * progressRateByMonth[m] : 0];
+      }));
+
+      // 外部売上：終了月に一括計上
+      const externalSales = Object.fromEntries(months.map(m => [m, (m === project.endMonth ? project.amount : 0)]));
+
+      // 売上高（外部売上+進行売上）：各月はその合計（合計列は空でもよい）
+      const salesTotal = Object.fromEntries(months.map(m => [m, externalSales[m] + progressSales[m]]));
+
+      // 付加価値：進行売上と同じ
+      const valueAdded = Object.fromEntries(months.map(m => [m, progressSales[m]]));
+      // 直課配分（直課経費）：当月の直課経費
+      const directAlloc = Object.fromEntries(months.map(m => [m, costMap.direct[m]]));
+
+      // 売上配分（付加価値＋直課配分）
+      const allocation = Object.fromEntries(months.map(m => [m, valueAdded[m] + directAlloc[m]]));
+
+      // 売上原価（社員人工費＋外注人工費＋直課経費）
+      const cogsTotal = Object.fromEntries(months.map(m => [m, cogs[m]]));
+      const cogsSum = totalCost;
+
+      // 売上総利益＝売上配分−売上原価
+      const grossProfit = Object.fromEntries(months.map(m => [m, allocation[m] - cogsTotal[m]]));
+
+      // 受注金額：開始月に計上
+      const orderAmountByMonth = Object.fromEntries(months.map(m => [m, (m === project.startMonth ? project.amount : 0)]));
+
+      // 原価累計：開始月→終了月の累計（表示月へマッピング済）
+      // 合計列は総原価見込と同じ
+      const cumCostTotal = cogsSum;
+
+      // 進捗率（原価累計/総原価見込）：月別
+      const rateTotal = (totalCost > 0) ? 1 : 0; // 最終月が100%イメージ
+
+      // ---- helpers for rendering ----
+      const colHeads = ['項目名','合計', ...months.map(m => `${m}月`)];
+      function thRow(){
+        return `<tr>${colHeads.map((h,i)=>`<th class="${i<=1?'':' '}">${escapeHtml(h)}</th>`).join('')}</tr>`;
+      }
+      function rowMoney(label, total, map, opts={}){
+        const blankTotal = !!opts.blankTotal;
+        const blankIfZero = !!opts.blankIfZero;
+        return `
+          <tr>
+            <td class="pl-left ${opts.classLeft||''}">${escapeHtml(label)}</td>
+            <td class="num">${blankTotal ? '' : formatCommaMaybeBlank(total, false)}</td>
+            ${months.map(m => `<td class="num">${formatCommaMaybeBlank(map[m] || 0, blankIfZero)}</td>`).join('')}
+          </tr>
+        `;
+      }
+      function rowPercent(label, totalRate, map){
+        return `
+          <tr>
+            <td class="pl-left">${escapeHtml(label)}</td>
+            <td class="num">${formatPercent(totalRate)}</td>
+            ${months.map(m => `<td class="num">${formatPercent(map[m] || 0)}</td>`).join('')}
+          </tr>
+        `;
+      }
+
+      // 売上高（外部+進行）…合計列はブランクでもよい
+      const html = `
+        <table>
+          <caption>${escapeHtml(project.name)}</caption>
+          <thead>
+            ${thRow()}
+          </thead>
+          <tbody>
+            <tr class="pl-group">
+              <td class="pl-left">売上高（外部売上+進行売上）</td>
+              <td class="num"></td>
+              ${months.map(m => `<td class="num">${formatCommaMaybeBlank(salesTotal[m] || 0, true)}</td>`).join('')}
+            </tr>
+
+            ${rowMoney('外部売上', project.amount, externalSales, { blankIfZero:true, classLeft:'pl-sub' })}
+            ${rowMoney('進行売上', progressSales[project.endMonth] || 0, progressSales, { blankIfZero:true, classLeft:'pl-sub' })}
+
+            <tr class="pl-group">
+              <td class="pl-left">売上配分（付加価値＋直課配分）</td>
+              <td class="num"></td>
+              ${months.map(m => `<td class="num">${formatCommaMaybeBlank(allocation[m] || 0, true)}</td>`).join('')}
+            </tr>
+
+            ${rowMoney('付加価値', valueAdded[project.endMonth] || 0, valueAdded, { blankIfZero:true, classLeft:'pl-sub' })}
+            ${rowMoney('直課配分（直課経費）', months.reduce((s,m)=>s + directAlloc[m], 0), directAlloc, { blankIfZero:true, classLeft:'pl-sub' })}
+
+            <tr class="pl-group">
+              <td class="pl-left">売上原価（社員人工費＋外注人工費＋直課経費）</td>
+              <td class="num">${formatCommaMaybeBlank(cogsSum, false)}</td>
+              ${months.map(m => `<td class="num">${formatCommaMaybeBlank(cogsTotal[m] || 0, true)}</td>`).join('')}
+            </tr>
+
+            ${rowMoney('社員人工費', months.reduce((s,m)=>s + costMap.employee[m], 0), costMap.employee, { blankIfZero:true, classLeft:'pl-sub' })}
+            ${rowMoney('外注人工費', months.reduce((s,m)=>s + costMap.outsourcing[m], 0), costMap.outsourcing, { blankIfZero:true, classLeft:'pl-sub' })}
+            ${rowMoney('直課経費', months.reduce((s,m)=>s + costMap.direct[m], 0), costMap.direct, { blankIfZero:true, classLeft:'pl-sub' })}
+
+            ${rowMoney('売上総利益', '', grossProfit, { blankTotal:true, blankIfZero:true })}
+
+            ${rowMoney('受注金額', project.amount, orderAmountByMonth, { blankIfZero:true })}
+
+            ${rowMoney('原価累計', cumCostTotal, cumCostByMonth, { blankIfZero:true })}
+
+            <tr>
+              <td class="pl-left">総原価見込</td>
+              <td class="num">${formatCommaMaybeBlank(cogsSum, false)}</td>
+              ${months.map(_ => `<td class="num"></td>`).join('')}
+            </tr>
+
+            ${rowPercent('進捗率（原価累計/総原価見込）', rateTotal, progressRateByMonth)}
+          </tbody>
+        </table>
+      `;
+      return html;
+    }
+
+    // =========================
+    // Init
+    // =========================
+    function escapeHtml(str){
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+    function escapeAttr(str){ return escapeHtml(str); }
+
+    function init(){
+      // month selects
+      document.getElementById('startMonth').innerHTML = buildMonthSelectOptions(true);
+      document.getElementById('endMonth').innerHTML   = buildMonthSelectOptions(true);
+
+      // amount input live format
+      const amtEl = document.getElementById('projectAmount');
+      amtEl.addEventListener('input', () => onCurrencyTyping(amtEl));
+      amtEl.addEventListener('blur', () => formatCurrencyInput(amtEl));
+
+      renderProjectList();
+      updateSummary();
+    }
+    init();
+  </script>
+</body>
+</html>
