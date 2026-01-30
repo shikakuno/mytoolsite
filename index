@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>My tool</title>
+</head>
+<body>
+    <h1>My tool</h1>
+
+    <p>
+        <a href="Mermaid">Mermaid へ移動</a>
+    </p>
+</body>
+</html>
