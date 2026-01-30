@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CVCA Mermaid 変換ツール</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Arial, sans-serif; margin: 0; }
+    header { padding: 12px 16px; border-bottom: 1px solid rgba(127,127,127,.3); display:flex; gap:10px; align-items:baseline; flex-wrap:wrap;}
+    header strong { font-size: 15px; }
+    header span { opacity: .8; font-size: 12px; }
+
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; }
+    @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+
+    .panel { border: 1px solid rgba(127,127,127,.3); border-radius: 10px; overflow: hidden; }
+    .panel h2 { margin: 0; padding: 10px 12px; font-size: 14px; border-bottom: 1px solid rgba(127,127,127,.3); }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border-bottom: 1px solid rgba(127,127,127,.3); align-items: center; }
+    button, select, input[type="checkbox"] {
+      border: 1px solid rgba(127,127,127,.4);
+      background: transparent;
+      padding: 6px 10px; border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(127,127,127,.12); }
+
+    textarea {
+      width: 100%; height: 66vh; min-height: 340px;
+      border: 0; outline: none; resize: vertical;
+      padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Noto Sans Mono", monospace;
+      font-size: 13px; line-height: 1.45;
+    }
+
+    #previewWrap { padding: 12px; overflow: auto; height: 66vh; min-height: 340px; }
+    #preview { display: inline-block; }
+    .hint { font-size: 12px; opacity: .8; padding: 10px 12px; border-top: 1px solid rgba(127,127,127,.3); }
+    .status { margin-left: auto; font-size: 12px; opacity: .85; }
+    .error { color: #d33; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+    .ok { color: #2a7; }
+    code { font-family: ui-monospace, monospace; }
+  </style>
+
+  <!-- Mermaid (ESM) -->
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+    const $ = (sel) => document.querySelector(sel);
+
+    function extractMermaidCode(text) {
+      // 1) ```mermaid ... ```
+      // 2) Mermaid code only
+      const fenceMatch = text.match(/```mermaid\s*([\s\S]*?)```/i);
+      if (fenceMatch && fenceMatch[1]) return fenceMatch[1].trim();
+      return text.trim();
+    }
+
+    function downloadText(filename, content, mime = "text/plain") {
+      const blob = new Blob([content], { type: mime });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 500);
+    }
+
+    function downloadDataUrl(filename, dataUrl) {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = filename;
+      a.click();
+    }
+
+    function svgToPngDataUrl(svgString, scale = 2) {
+      return new Promise((resolve, reject) => {
+        const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(svgBlob);
+
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.ceil(img.width * scale);
+          canvas.height = Math.ceil(img.height * scale);
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+        img.src = url;
+      });
+    }
+
+    // Mermaid init (theme is updated later on each render)
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict", // safer; if you need HTML labels, change to "loose"
+      theme: "default",
+      flowchart: { curve: "linear" },
+    });
+
+    // CVCA向けサンプル（「プレイヤー」と「価値の流れ」をMermaid flowchartで表現）
+    function cvcaSample() {
+      return `\`\`\`mermaid
+flowchart LR
+  %% =========================
+  %% CVCA SAMPLE
+  %% - subgraphで主体（顧客/自社/パートナー等）を分ける
+  %% - 矢印のラベルに「価値（提供/取得）」を書く
+  %% =========================
+
+  subgraph CUST[顧客]
+    C1([エンドユーザー])
+    C2([意思決定者])
+  end
+
+  subgraph COMP[自社]
+    S1([営業])
+    S2([CS])
+    S3([プロダクト])
+  end
+
+  subgraph PART[パートナー]
+    P1([販売代理店])
+    P2([決済/物流])
+  end
+
+  subgraph SOC[周辺/社会]
+    G1([規制・行政])
+    M1([コミュニティ])
+  end
+
+  %% 価値のやり取り（例）
+  C2 -- "購入意思 / 要件" --> S1
+  S1 -- "提案 / 見積" --> C2
+
+  C1 -- "利用データ / フィードバック" --> S2
+  S2 -- "サポート / 学習支援" --> C1
+
+  S3 -- "機能提供 / 改善" --> C1
+  C1 -- "利用料" --> P2
+  P2 -- "入金 / 取引情報" --> COMP
+
+  P1 -- "リード / 案件" --> S1
+  S1 -- "販売手数料" --> P1
+
+  G1 -- "規制要件" --> S3
+  COMP -- "コンプライアンス対応" --> G1
+
+  M1 -- "評判 / 口コミ" --> C1
+  C1 -- "参加 / 投稿" --> M1
+\`\`\``;
+    }
+
+    // CVCAテンプレ（空の骨格）
+    function cvcaTemplate() {
+      return `\`\`\`mermaid
+flowchart LR
+  %% CVCA TEMPLATE
+  %% subgraphに「主体（プレイヤー）」を置き、矢印ラベルに「価値」を書く
+
+  subgraph CUST[顧客]
+    C1([顧客A])
+  end
+
+  subgraph COMP[自社]
+    S1([部署/担当])
+  end
+
+  subgraph PART[パートナー]
+    P1([パートナーA])
+  end
+
+  %% 価値の流れ（例）
+  C1 -- "価値(顧客→自社)" --> S1
+  S1 -- "価値(自社→顧客)" --> C1
+\`\`\``;
+    }
+
+    // App state
+    let lastSvg = "";
+    let renderTimer = null;
+
+    async function render() {
+      const raw = $("#input").value;
+      const code = extractMermaidCode(raw);
+
+      $("#error").textContent = "";
+      $("#status").textContent = "Rendering...";
+      $("#status").className = "status";
+
+      if (!code) {
+        $("#preview").innerHTML = "";
+        $("#status").textContent = "No input";
+        return;
+      }
+
+      // Theme
+      const theme = $("#theme").value;
+
+      // CVCA向けの“見た目”を少し整える：背景・丸み・線
+      const cvcaStyle = $("#cvcaStyle").checked;
+
+      const baseConfig = {
+        theme,
+        flowchart: { curve: "linear" },
+        securityLevel: "strict",
+      };
+
+      // Mermaidのテーマ変数を軽く調整（CVCAっぽく“箱が読みやすい”方向）
+      // ※色指定は最低限。もっとこだわるならCSS変数を増やす。
+      const themeVariables = cvcaStyle ? {
+        fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", Arial, sans-serif',
+        fontSize: "14px",
+        borderRadius: "10",
+      } : undefined;
+
+      mermaid.initialize({ ...baseConfig, themeVariables });
+
+      try {
+        const id = "cvca_" + Math.random().toString(16).slice(2);
+        const { svg } = await mermaid.render(id, code);
+        lastSvg = svg;
+        $("#preview").innerHTML = svg;
+        $("#status").textContent = "OK";
+        $("#status").className = "status ok";
+      } catch (err) {
+        lastSvg = "";
+        $("#preview").innerHTML = "";
+        $("#error").textContent = String(err?.message || err);
+        $("#status").textContent = "Error";
+        $("#status").className = "status";
+      }
+    }
+
+    function scheduleRender() {
+      clearTimeout(renderTimer);
+      renderTimer = setTimeout(render, 250);
+    }
+
+    function setText(v) {
+      $("#input").value = v;
+      render();
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      $("#input").addEventListener("input", scheduleRender);
+      $("#theme").addEventListener("change", render);
+      $("#cvcaStyle").addEventListener("change", render);
+
+      $("#btnRender").addEventListener("click", render);
+      $("#btnSample").addEventListener("click", () => setText(cvcaSample()));
+      $("#btnTemplate").addEventListener("click", () => setText(cvcaTemplate()));
+
+      $("#btnDownloadSvg").addEventListener("click", () => {
+        if (!lastSvg) return alert("まずは正常にレンダリングしてください。");
+        downloadText("cvca.svg", lastSvg, "image/svg+xml");
+      });
+
+      $("#btnCopySvg").addEventListener("click", async () => {
+        if (!lastSvg) return alert("まずは正常にレンダリングしてください。");
+        try {
+          await navigator.clipboard.writeText(lastSvg);
+          $("#status").textContent = "SVG copied";
+          $("#status").className = "status ok";
+        } catch {
+          alert("クリップボードにコピーできませんでした。");
+        }
+      });
+
+      $("#btnDownloadPng").addEventListener("click", async () => {
+        if (!lastSvg) return alert("まずは正常にレンダリングしてください。");
+        try {
+          const scale = Number($("#pngScale").value || 2);
+          const pngUrl = await svgToPngDataUrl(lastSvg, scale);
+          downloadDataUrl("cvca.png", pngUrl);
+        } catch (e) {
+          alert("PNG変換に失敗しました: " + (e?.message || e));
+        }
+      });
+
+      // initial
+      setText(cvcaSample());
+    });
+  </script>
+</head>
+
+<body>
+  <header>
+    <strong>CVCA Mermaid 変換ツール</strong>
+    <span>Mermaid（CVCAのMarkdown）→ 図表示 / SVG・PNG保存</span>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>入力（Markdown / Mermaid）</h2>
+      <div class="toolbar">
+        <button id="btnSample" type="button">CVCAサンプル</button>
+        <button id="btnTemplate" type="button">CVCAテンプレ</button>
+        <button id="btnRender" type="button">再レンダリング</button>
+
+        <label style="display:flex;gap:6px;align-items:center;">
+          テーマ
+          <select id="theme">
+            <option value="default">default</option>
+            <option value="neutral">neutral</option>
+            <option value="dark">dark</option>
+            <option value="forest">forest</option>
+            <option value="base">base</option>
+          </select>
+        </label>
+
+        <label style="display:flex;gap:8px;align-items:center;">
+          <input id="cvcaStyle" type="checkbox" checked />
+          CVCA向け見た目
+        </label>
+
+        <span class="status" id="status">-</span>
+      </div>
+
+      <textarea id="input" spellcheck="false"
+        placeholder="```mermaid 〜 ``` または Mermaidコードを貼り付け（CVCAは flowchart LR 推奨）"></textarea>
+
+      <div class="hint">
+        CVCAは <code>subgraph</code> で主体（顧客/自社/パートナー等）を分け、矢印ラベルに「価値」を書くのが扱いやすいです。<br/>
+        入力は <code>```mermaid</code> フェンス付きでも、Mermaidコード単体でもOK。
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>プレビュー（図）</h2>
+      <div class="toolbar">
+        <button id="btnDownloadSvg" type="button">SVG保存</button>
+        <button id="btnCopySvg" type="button">SVGをコピー</button>
+
+        <label style="display:flex;gap:6px;align-items:center;">
+          PNG倍率
+          <select id="pngScale">
+            <option value="1">1x</option>
+            <option value="2" selected>2x</option>
+            <option value="3">3x</option>
+            <option value="4">4x</option>
+          </select>
+        </label>
+
+        <button id="btnDownloadPng" type="button">PNG保存</button>
+      </div>
+
+      <div id="previewWrap">
+        <div id="preview"></div>
+        <div id="error" class="error"></div>
+      </div>
+
+      <div class="hint">
+        エラー時は：全角記号／インデント／未対応記法／矢印ラベルの引用符などを確認してください。
+      </div>
+    </section>
+  </main>
+</body>
+</html>
