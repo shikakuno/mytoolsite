@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mermaid シーケンス図 → 画像変換</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #f6f7f9; color: #111; }
+    header { padding: 16px 20px; background: #fff; border-bottom: 1px solid #e6e8ee; }
+    main { display: grid; grid-template-columns: 420px 1fr; gap: 14px; padding: 14px; }
+    .panel { background: #fff; border: 1px solid #e6e8ee; border-radius: 12px; overflow: hidden; }
+    .panel h2 { margin: 0; padding: 12px 14px; font-size: 14px; border-bottom: 1px solid #eef0f6; }
+    .panel .content { padding: 12px 14px; }
+    textarea {
+      width: 100%;
+      height: 420px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.4;
+      padding: 10px;
+      border: 1px solid #dfe3ec;
+      border-radius: 10px;
+      outline: none;
+    }
+    textarea:focus { border-color: #8aa4ff; box-shadow: 0 0 0 3px rgba(138,164,255,.25); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #dfe3ec;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.primary { background: #2f62ff; color: #fff; border-color: #2f62ff; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .hint { color: #555; font-size: 12px; margin-top: 8px; }
+    .error { color: #b00020; font-size: 12px; white-space: pre-wrap; margin-top: 10px; }
+    .preview-wrap { overflow: auto; padding: 14px; height: calc(100vh - 120px); }
+    .preview-box {
+      background: #fff;
+      border: 1px dashed #dfe3ec;
+      border-radius: 12px;
+      padding: 14px;
+      min-height: 200px;
+      display: grid;
+      place-items: center;
+    }
+    .footer { padding: 10px 14px; border-top: 1px solid #eef0f6; font-size: 12px; color: #666; }
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .preview-wrap { height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex; gap:12px; align-items: baseline; flex-wrap: wrap;">
+      <h1 style="font-size:16px; margin:0;">Mermaid（マーメイド）シーケンス図 → 画像変換</h1>
+      <span style="font-size:12px; color:#666;">Mermaid記法を貼り付けて、SVG/PNGとして保存できます</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>入力（Mermaid記法）</h2>
+      <div class="content">
+        <textarea id="src" spellcheck="false">sequenceDiagram
+  autonumber
+  participant U as User
+  participant W as WebApp
+  participant S as Server
+
+  U->>W: Mermaidコードを入力
+  W->>W: シーケンス図を描画
+  W-->>U: プレビュー表示
+  U->>W: PNG/SVGで保存
+  W->>U: 画像をダウンロード</textarea>
+
+        <div class="row" style="margin-top:10px;">
+          <button class="primary" id="renderBtn">描画</button>
+          <button id="downloadSvgBtn" disabled>SVG保存</button>
+          <button id="downloadPngBtn" disabled>PNG保存</button>
+
+          <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#333;">
+            PNG倍率
+            <select id="scale" style="padding:8px; border-radius:10px; border:1px solid #dfe3ec;">
+              <option value="1">1x</option>
+              <option value="2" selected>2x</option>
+              <option value="3">3x</option>
+              <option value="4">4x</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="hint">
+          例：<code>sequenceDiagram</code> から始めてください（他の図種も基本的に描画できます）。
+        </div>
+        <div class="error" id="err"></div>
+      </div>
+      <div class="footer">
+        ローカルで動作（サーバー不要）。CDNでMermaidを読み込みます。
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>プレビュー</h2>
+      <div class="preview-wrap">
+        <div class="preview-box" id="preview">
+          <div style="color:#666; font-size:13px;">「描画」を押すとここに表示されます</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Mermaid (ESM) -->
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+    // Mermaid 初期化
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: "default"
+    });
+
+    const src = document.getElementById("src");
+    const preview = document.getElementById("preview");
+    const err = document.getElementById("err");
+    const renderBtn = document.getElementById("renderBtn");
+    const downloadSvgBtn = document.getElementById("downloadSvgBtn");
+    const downloadPngBtn = document.getElementById("downloadPngBtn");
+    const scaleSel = document.getElementById("scale");
+
+    let lastSvgText = "";
+    let lastSvgEl = null;
+
+    function setError(message) {
+      err.textContent = message || "";
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function getFileBaseName() {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      return `sequence_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    }
+
+    async function render() {
+      setError("");
+      downloadSvgBtn.disabled = true;
+      downloadPngBtn.disabled = true;
+      lastSvgText = "";
+      lastSvgEl = null;
+
+      const code = src.value.trim();
+      if (!code) {
+        preview.innerHTML = '<div style="color:#666; font-size:13px;">入力が空です</div>';
+        return;
+      }
+
+      try {
+        const id = "m" + crypto.randomUUID().replaceAll("-", "");
+        const { svg } = await mermaid.render(id, code);
+
+        preview.innerHTML = svg;
+
+        // 生成されたSVG要素を保持
+        const svgEl = preview.querySelector("svg");
+        if (!svgEl) throw new Error("SVGの生成に失敗しました。Mermaidコードをご確認ください。");
+
+        // 画像として扱いやすいように属性調整
+        svgEl.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        svgEl.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+        lastSvgEl = svgEl;
+        lastSvgText = new XMLSerializer().serializeToString(svgEl);
+
+        downloadSvgBtn.disabled = false;
+        downloadPngBtn.disabled = false;
+      } catch (e) {
+        preview.innerHTML = '<div style="color:#b00020; font-size:13px;">描画エラー</div>';
+        setError(String(e?.message || e));
+      }
+    }
+
+    function downloadSvg() {
+      if (!lastSvgText) return;
+      const blob = new Blob([lastSvgText], { type: "image/svg+xml;charset=utf-8" });
+      downloadBlob(blob, `${getFileBaseName()}.svg`);
+    }
+
+    async function downloadPng() {
+      if (!lastSvgEl) return;
+
+      // SVGのサイズ取得（viewBox優先、無ければgetBBox）
+      let width = 0, height = 0;
+      const vb = lastSvgEl.viewBox?.baseVal;
+      if (vb && vb.width && vb.height) {
+        width = vb.width;
+        height = vb.height;
+      } else {
+        const bbox = lastSvgEl.getBBox();
+        width = bbox.width;
+        height = bbox.height;
+      }
+
+      // 念のため最小値
+      width = Math.max(1, Math.ceil(width));
+      height = Math.max(1, Math.ceil(height));
+
+      const scale = Number(scaleSel.value || 2);
+
+      // SVGをData URL化
+      const svgText = new XMLSerializer().serializeToString(lastSvgEl);
+      const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(svgBlob);
+
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const i = new Image();
+          // 同一生成元扱い（SVG blob）なので基本OK。念のため。
+          i.onload = () => resolve(i);
+          i.onerror = () => reject(new Error("PNG変換用の画像読み込みに失敗しました。"));
+          i.src = url;
+        });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        const ctx = canvas.getContext("2d");
+
+        // 背景を白にしたい場合は次の2行を有効化
+        // ctx.fillStyle = "#ffffff";
+        // ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (!blob) throw new Error("PNG生成に失敗しました。");
+
+        downloadBlob(blob, `${getFileBaseName()}@${scale}x.png`);
+      } catch (e) {
+        setError(String(e?.message || e));
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    renderBtn.addEventListener("click", render);
+    downloadSvgBtn.addEventListener("click", downloadSvg);
+    downloadPngBtn.addEventListener("click", downloadPng);
+
+    // 初回自動描画
+    render();
+  </script>
+</body>
+</html>
