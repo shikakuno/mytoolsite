@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Markdown Gantt (single HTML)</title>
+  <style>
+    /* ====== Theme: Off-white / Light Blue / Gray ====== */
+    :root{
+      --bg: #F7F6F2;         /* off-white */
+      --panel: #FFFFFF;      /* white */
+      --panel2: #F3F4F6;     /* light gray */
+      --text: #1F2937;       /* gray-800 */
+      --muted: #6B7280;      /* gray-500 */
+      --border: #D1D5DB;     /* gray-300 */
+      --shadow: rgba(17, 24, 39, 0.08);
+
+      --blue: #CFE8FF;       /* light blue */
+      --blue2:#9DCBFF;       /* medium light blue */
+      --blueInk:#1D4ED8;     /* blue-700 */
+      --warn:#DC2626;        /* red-600 */
+
+      --rowH: 28px;
+      --radius: 16px;
+      --radiusSm: 10px;
+
+      --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans JP", Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:var(--font);
+    }
+
+    header{
+      position:sticky; top:0; z-index:10;
+      background: rgba(247, 246, 242, 0.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding:12px 14px;
+      display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+    }
+
+    header h1{
+      font-size:14px; margin:0;
+      color:var(--muted);
+      font-weight:700;
+      letter-spacing:.2px;
+    }
+
+    .btn{
+      appearance:none;
+      border:1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding:8px 10px;
+      border-radius: var(--radiusSm);
+      cursor:pointer;
+      font-size:12px;
+      display:inline-flex; gap:8px; align-items:center;
+      box-shadow: 0 1px 0 rgba(0,0,0,.03);
+    }
+    .btn:hover{
+      background: #FAFAFA;
+      border-color: #C7CBD1;
+    }
+
+    .btn.primary{
+      border-color: rgba(29,78,216,.25);
+      background: linear-gradient(180deg, var(--blue), #FFFFFF);
+    }
+    .btn.primary:hover{
+      border-color: rgba(29,78,216,.35);
+      background: linear-gradient(180deg, #BFE0FF, #FFFFFF);
+    }
+
+    .btn.danger{
+      border-color: rgba(220,38,38,.22);
+      background: #FFF5F5;
+    }
+    .btn.danger:hover{
+      border-color: rgba(220,38,38,.32);
+      background: #FFECEC;
+    }
+
+    .btn.ghost{
+      background: transparent;
+    }
+    .btn.ghost:hover{
+      background: rgba(207,232,255,.35);
+    }
+
+    .wrap{
+      display:grid;
+      grid-template-columns: 460px 1fr;
+      gap:12px;
+      padding:12px;
+      height: calc(100vh - 60px);
+    }
+    @media (max-width: 980px){
+      .wrap{ grid-template-columns: 1fr; height:auto; }
+    }
+
+    .card{
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      overflow:hidden;
+      box-shadow: 0 10px 24px var(--shadow);
+      display:flex;
+      flex-direction:column;
+      min-height: 240px;
+    }
+
+    .card .hd{
+      padding:12px 12px 8px;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:flex-start; justify-content:space-between;
+      gap:10px; flex-wrap:wrap;
+      background: linear-gradient(180deg, rgba(207,232,255,.45), rgba(255,255,255,0));
+    }
+
+    .card .hd .title{ font-weight:800; font-size:13px; color: var(--text); }
+    .card .hd .sub{ color:var(--muted); font-size:12px; }
+
+    textarea#md{
+      flex:1;
+      width:100%;
+      border:0;
+      outline:none;
+      padding:12px;
+      resize:none;
+      background: #FFFFFF;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size:12px;
+      line-height:1.5;
+    }
+
+    .controls{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      color:var(--muted); font-size:12px;
+    }
+    .controls label{ display:inline-flex; gap:8px; align-items:center; }
+    input[type="range"]{ width:180px; }
+    input[type="checkbox"]{ transform: translateY(1px); }
+
+    .hint{
+      padding:10px 12px;
+      border-top:1px solid var(--border);
+      color:var(--muted);
+      font-size:12px;
+      background: var(--panel2);
+    }
+    .hint code{
+      color: var(--text);
+      background: rgba(207,232,255,.5);
+      border: 1px solid rgba(29,78,216,.15);
+      padding:2px 6px;
+      border-radius:999px;
+    }
+
+    .rowEditor{
+      border-top:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(243,244,246,.95), rgba(255,255,255,.9));
+      padding:10px 12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .rowEditor .top{
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+      color:var(--muted); font-size:12px;
+    }
+
+    .rowEditor input[type="number"],
+    .rowEditor input[type="text"]{
+      background: #FFFFFF;
+      border:1px solid var(--border);
+      color: var(--text);
+      padding:7px 9px;
+      border-radius: var(--radiusSm);
+      outline:none;
+    }
+    .rowEditor input[type="number"]{ width:110px; }
+    .rowEditor input[type="text"]{
+      flex:1;
+      min-width: 220px;
+      font-family: var(--mono);
+      font-size:12px;
+    }
+    .rowEditor input:focus{
+      border-color: rgba(29,78,216,.35);
+      box-shadow: 0 0 0 3px rgba(207,232,255,.6);
+    }
+
+    .rowEditor .msg{
+      color: var(--muted);
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+    .rowEditor .msg.err{ color: var(--warn); }
+
+    .stage{
+      position:relative;
+      overflow:auto;
+      height:100%;
+      background: linear-gradient(180deg, rgba(243,244,246,.65), rgba(255,255,255,1));
+    }
+    .stageInner{ min-width: 900px; padding:12px; }
+
+    .errBox{
+      padding:10px 12px;
+      background: #FFF5F5;
+      border: 1px solid rgba(220,38,38,.25);
+      border-radius: 12px;
+      color: #991B1B;
+      font-size:12px;
+      margin: 12px;
+      white-space: pre-wrap;
+    }
+
+    .legend{
+      display:flex; gap:10px; flex-wrap:wrap;
+      padding:10px 12px;
+      border-top:1px solid var(--border);
+      background: var(--panel2);
+      color: var(--muted);
+      font-size:12px;
+    }
+    .pill{
+      display:inline-flex; gap:8px; align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: #FFFFFF;
+      box-shadow: 0 1px 0 rgba(0,0,0,.03);
+    }
+    .swatch{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+
+    .fileInput{ display:none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Markdown → ガントチャート（HTMLファイル1つ）</h1>
+
+    <button class="btn primary" id="btnRender">描画</button>
+
+    <label class="btn ghost" for="fileImport">インポート（.md/.txt）</label>
+    <input class="fileInput" id="fileImport" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" />
+
+    <button class="btn" id="btnExport">エクスポート（.md）</button>
+
+    <button class="btn" id="btnDownloadSvg">SVG保存</button>
+    <button class="btn" id="btnDownloadPng">PNG保存</button>
+
+    <button class="btn danger" id="btnClear">クリア</button>
+
+    <div class="controls" style="margin-left:auto;">
+      <label>横スケール（日あたりpx）
+        <input type="range" id="scale" min="10" max="80" value="28" />
+        <span id="scaleVal">28</span>
+      </label>
+      <label><input type="checkbox" id="showToday" checked>今日ライン</label>
+      <label><input type="checkbox" id="showWeekends" checked>土日網掛け</label>
+      <label><input type="checkbox" id="compact">コンパクト</label>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <section class="card">
+      <div class="hd">
+        <div>
+          <div class="title">Markdownデータ</div>
+          <div class="sub">対応形式：Markdown表 / パイプ区切り行（箇条書きOK）</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span class="sub">サンプルプリセット：</span>
+          <button class="btn" id="presetA">プロジェクトA</button>
+          <button class="btn" id="presetB">研究開発</button>
+          <button class="btn" id="presetC">研修計画</button>
+        </div>
+      </div>
+
+      <textarea id="md"></textarea>
+
+      <div class="rowEditor">
+        <div class="top">
+          <strong style="color:var(--text); font-size:12px;">行番号編集</strong>
+          <span>行：</span>
+          <input type="number" id="lineNo" min="1" step="1" value="1" />
+          <button class="btn" id="btnLoadLine">表示</button>
+          <button class="btn primary" id="btnSaveLine">保存</button>
+          <button class="btn" id="btnJumpLine">その行へスクロール</button>
+        </div>
+        <input type="text" id="lineText" placeholder="ここに選択行の内容が表示されます（編集して保存できます）" />
+        <div class="msg" id="lineMsg"></div>
+      </div>
+
+      <div class="hint">
+        行の例：<code>タスク名 | 2026-02-01 | 2026-02-10 | 担当 | #4cc9f0</code><br/>
+        表の例：<code>| Task | Start | End | Owner | Color |</code>（ヘッダ名は大小/日本語でもOK）
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="hd">
+        <div>
+          <div class="title">プレビュー</div>
+          <div class="sub">スクロール・ズーム・保存対応</div>
+        </div>
+        <div class="sub" id="meta"></div>
+      </div>
+      <div class="stage" id="stage">
+        <div class="stageInner">
+          <div id="error" style="display:none;"></div>
+          <div id="svgHost"></div>
+        </div>
+      </div>
+      <div class="legend" id="legend" style="display:none;"></div>
+    </section>
+  </div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const el = {
+    md: $("md"),
+    btnRender: $("btnRender"),
+
+    fileImport: $("fileImport"),
+    btnExport: $("btnExport"),
+
+    btnDownloadSvg: $("btnDownloadSvg"),
+    btnDownloadPng: $("btnDownloadPng"),
+    btnClear: $("btnClear"),
+
+    presetA: $("presetA"),
+    presetB: $("presetB"),
+    presetC: $("presetC"),
+
+    lineNo: $("lineNo"),
+    lineText: $("lineText"),
+    btnLoadLine: $("btnLoadLine"),
+    btnSaveLine: $("btnSaveLine"),
+    btnJumpLine: $("btnJumpLine"),
+    lineMsg: $("lineMsg"),
+
+    scale: $("scale"),
+    scaleVal: $("scaleVal"),
+    showToday: $("showToday"),
+    showWeekends: $("showWeekends"),
+    compact: $("compact"),
+
+    svgHost: $("svgHost"),
+    error: $("error"),
+    meta: $("meta"),
+    legend: $("legend"),
+    stage: $("stage"),
+  };
+
+  // ====== Presets ======
+  const PRESETS = {
+    "プロジェクトA": `# プロジェクトA
+
+| Task | Start | End | Owner | Color |
+|---|---:|---:|---|---|
+| 要件定義 | 2026-02-01 | 2026-02-07 | 角野 | #4cc9f0 |
+| 設計 | 2026-02-06 | 2026-02-14 | 田中 | #a3ff12 |
+| 実装 | 2026-02-10 | 2026-02-25 | 佐藤 | #ffb703 |
+| テスト | 2026-02-20 | 2026-03-03 | 鈴木 | #ff6b6b |
+| リリース | 2026-03-05 | 2026-03-05 | 全員 | #8ecae6 |
+
+## 別形式（パイプ区切り行でもOK）
+- ドキュメント整備 | 2026-02-12 | 2026-02-18 | 角野 | #c77dff
+`,
+    "研究開発": `# 研究開発（例）
+
+- 文献調査 | 2026-02-03 | 2026-02-12 | R&D | #4cc9f0
+- PoC設計 | 2026-02-10 | 2026-02-18 | R&D | #ffb703
+- プロトタイプ実装 | 2026-02-17 | 2026-03-04 | Dev | #a3ff12
+- 評価（性能/精度） | 2026-03-01 | 2026-03-10 | QA | #ff6b6b
+- レポート作成 | 2026-03-08 | 2026-03-14 | R&D | #c77dff
+`,
+    "研修計画": `# 研修計画（例）
+
+| タスク | 開始日 | 終了日 | 担当 | 色 |
+|---|---|---|---|---|
+| 事前アンケート | 2026-02-05 | 2026-02-06 | 事務局 | #8ecae6 |
+| 教材作成 | 2026-02-06 | 2026-02-20 | 講師 | #4cc9f0 |
+| 受講募集 | 2026-02-10 | 2026-02-18 | 事務局 | #ffb703 |
+| 研修実施 | 2026-02-25 | 2026-02-25 | 講師 | #a3ff12 |
+| フォローアップ | 2026-02-26 | 2026-03-05 | 講師 | #ff6b6b |
+`
+  };
+
+  // ---------- Utilities ----------
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const fmtYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+
+  function parseDate(s) {
+    const t = String(s || "").trim();
+    const m = t.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2])-1, da = Number(m[3]);
+    const d = new Date(y, mo, da);
+    if (d.getFullYear() !== y || d.getMonth() !== mo || d.getDate() !== da) return null;
+    return d;
+  }
+
+  function daysBetween(a, b) {
+    const ms = 24*60*60*1000;
+    const A = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime();
+    const B = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime();
+    return Math.round((B - A) / ms);
+  }
+
+  function addDays(d, n) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    x.setDate(x.getDate() + n);
+    return x;
+  }
+
+  function isWeekend(d) {
+    const w = d.getDay();
+    return w === 0 || w === 6;
+  }
+
+  function sanitizeText(s) {
+    return String(s ?? "").replace(/[<>&"]/g, (c) => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  }
+
+  function normalizeHeaderName(s) {
+    const t = String(s||"").trim().toLowerCase();
+    const map = new Map([
+      ["task","task"], ["name","task"], ["title","task"], ["タスク","task"], ["作業","task"], ["項目","task"],
+      ["start","start"], ["開始","start"], ["開始日","start"], ["開始日付","start"], ["from","start"],
+      ["end","end"], ["終了","end"], ["終了日","end"], ["終了日付","end"], ["to","end"],
+      ["owner","owner"], ["担当","owner"], ["担当者","owner"], ["assignee","owner"],
+      ["color","color"], ["色","color"], ["カラー","color"],
+      ["group","group"], ["カテゴリ","group"], ["category","group"], ["phase","group"]
+    ]);
+    return map.get(t) || t;
+  }
+
+  // ---------- Parsing ----------
+  function parseMarkdownGantt(mdText) {
+    const lines = String(mdText||"")
+      .split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(l => l.length > 0 && !l.startsWith("```"));
+
+    const tasks = [];
+
+    // 1) markdown tables
+    for (let i=0; i<lines.length; i++) {
+      const line = lines[i];
+      if (!line.startsWith("|")) continue;
+
+      const header = splitRow(line);
+      if (header.length < 3) continue;
+
+      const sep = lines[i+1] || "";
+      if (sep.startsWith("|") && isSeparatorRow(sep)) {
+        const headerMap = header.map(normalizeHeaderName);
+        i += 2;
+        while (i < lines.length && lines[i].startsWith("|")) {
+          if (isSeparatorRow(lines[i])) { i++; continue; }
+          const row = splitRow(lines[i]);
+          const obj = rowToTask(row, headerMap);
+          if (obj) tasks.push(obj);
+          i++;
+        }
+        i--;
+      }
+    }
+
+    // 2) pipe rows
+    for (const raw of lines) {
+      const line = raw.replace(/^\s*[-*]\s*/, "");
+      if (line.startsWith("|")) continue;
+      if ((line.match(/\|/g)||[]).length < 2) continue;
+      const parts = line.split("|").map(x => x.trim()).filter(Boolean);
+      if (parts.length < 3) continue;
+      const [task, start, end, owner, color, group] = parts;
+      const s = parseDate(start), e = parseDate(end);
+      if (!task || !s || !e) continue;
+      tasks.push({ task, start: s, end: e, owner: owner||"", color: color||"", group: group||"" });
+    }
+
+    for (const t of tasks) {
+      if (t.end < t.start) { const tmp=t.start; t.start=t.end; t.end=tmp; }
+      t.task = String(t.task||"").trim();
+      t.owner = String(t.owner||"").trim();
+      t.color = String(t.color||"").trim();
+      t.group = String(t.group||"").trim();
+    }
+
+    const key = (t) => [t.task, fmtYMD(t.start), fmtYMD(t.end), t.owner].join("::");
+    const seen = new Set();
+    const out = [];
+    for (const t of tasks) {
+      const k = key(t);
+      if (!seen.has(k)) { seen.add(k); out.push(t); }
+    }
+    return out;
+
+    function splitRow(line) {
+      return line
+        .split("|")
+        .map(x => x.trim())
+        .filter((x, idx, arr) => !(idx===0 && x==="") && !(idx===arr.length-1 && x===""));
+    }
+
+    function isSeparatorRow(line) {
+      const cells = splitRow(line);
+      if (cells.length === 0) return false;
+      return cells.every(c => /^:?-{3,}:?$/.test(c));
+    }
+
+    function rowToTask(row, headerMap) {
+      const obj = { task:"", start:null, end:null, owner:"", color:"", group:"" };
+      for (let j=0; j<Math.min(row.length, headerMap.length); j++) {
+        const k = headerMap[j], v = row[j];
+        if (k === "task") obj.task = v;
+        else if (k === "start") obj.start = parseDate(v);
+        else if (k === "end") obj.end = parseDate(v);
+        else if (k === "owner") obj.owner = v;
+        else if (k === "color") obj.color = v;
+        else if (k === "group") obj.group = v;
+      }
+      if (!obj.task || !obj.start || !obj.end) return null;
+      return obj;
+    }
+  }
+
+  // ---------- Render (SVG) ----------
+  function render(tasks, opts) {
+    const { pxPerDay, showToday, showWeekends, compact } = opts;
+
+    if (!tasks.length) {
+      showError("タスクが見つかりませんでした。\nMarkdown表、または「タスク | 開始 | 終了 | 担当 | 色」のパイプ区切り行で入力してください。");
+      el.svgHost.innerHTML = "";
+      el.legend.style.display = "none";
+      el.meta.textContent = "";
+      return;
+    }
+
+    tasks.sort((a,b) => a.start - b.start || a.end - b.end || a.task.localeCompare(b.task, "ja"));
+
+    let min = tasks[0].start, max = tasks[0].end;
+    for (const t of tasks) {
+      if (t.start < min) min = t.start;
+      if (t.end > max) max = t.end;
+    }
+
+    const padLeft = 2, padRight = 2;
+    const startDate = addDays(min, -padLeft);
+    const endDate = addDays(max, padRight);
+
+    const totalDays = daysBetween(startDate, endDate) + 1;
+    const leftLabelW = compact ? 180 : 260;
+    const rowH = compact ? 22 : 28;
+    const topAxisH = compact ? 52 : 62;
+    const barH = compact ? 12 : 14;
+    const barYPad = Math.max(4, Math.floor((rowH - barH)/2));
+    const w = leftLabelW + totalDays * pxPerDay + 24;
+    const h = topAxisH + tasks.length * rowH + 20;
+
+    const today = new Date();
+    const today0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    const by = (t) => (t.group || t.owner || "未分類");
+    const buckets = new Map();
+    for (const t of tasks) {
+      const k = by(t);
+      if (!buckets.has(k)) buckets.set(k, new Set());
+      if (t.color) buckets.get(k).add(t.color);
+    }
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    svg.setAttribute("width", w);
+    svg.setAttribute("height", h);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.style.display = "block";
+
+    rect(0, 0, w, h, { fill: "rgba(0,0,0,0)" });
+
+    for (let d=0; d<totalDays; d++) {
+      const x = leftLabelW + d*pxPerDay;
+      const date = addDays(startDate, d);
+
+      if (showWeekends &&
